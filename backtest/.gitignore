@@ -1,0 +1,6 @@
+# FinMind 授權：非商業、不得再散布原始資料、需標示來源「FinMind」。
+# 原始資料和含原始數值的輸出一律不進公開 repo。
+data/
+runs/
+data-probe-20261023/
+__pycache__/
