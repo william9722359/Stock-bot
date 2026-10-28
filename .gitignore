@@ -28,3 +28,10 @@
 !/code/tests/test_leak.py
 !/code/update_scorecard.py
 !/code/tests/test_scorecard.py
+!/drill/
+/drill/*
+!/drill/drill_r10.py
+!/drill/drill-rules-v9-public.md
+!/drill/drill-rules-v9-public.md.sha256
+!/drill/SHA256SUMS
+!/drill/drill-20261028-r10-public.md
