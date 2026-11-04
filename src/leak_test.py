@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """防偷看測試（v1.0.1：含 M2 機率、M3、M4、M5、輪次）：抽 50 個 T+1 目標日 k（seed 20261104），把 k 日（含）以後的收盤與法人值換亂數，重跑；k 日（含）以前的預測要逐筆相同。"""
-import sys, os
+import sys, os, tempfile
 if len(sys.argv) > 1: sys.exit(2)
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -17,7 +17,9 @@ for k in ks:
     _, p, _ = C.run_models(dates, c2, o2, d2, s2)
     bad = [dates[i] for i in keys if i <= k and p[i] != base[i]]
     if bad: fails.append((dates[k], bad[:3]))
-out = os.path.join(C.ROOT, "results", C.VERSION, "leak_test.txt"); os.makedirs(os.path.dirname(out), exist_ok=True)
+out = os.path.join(tempfile.mkdtemp(prefix="stockbot-leak-"), "leak_test.txt")
 with open(out, "x") as fh:
     fh.write(("PASS" if not fails else "FAIL") + f" 50 個 k，失敗 {len(fails)}；k={[dates[k] for k in ks]}；{fails}\n")
-print("PASS" if not fails else "FAIL", len(fails)); sys.exit(0 if not fails else 1)
+print("PASS" if not fails else "FAIL", len(fails))
+print(out)
+sys.exit(0 if not fails else 1)

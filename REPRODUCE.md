@@ -1,28 +1,40 @@
-# REPRODUCE（v1.0.3b；FinMind・回測練習，不算正式成績）
-方法見 `METHOD.md`。
+# Backtest v1.0.4 重現指引
 
-## 0. 環境
-python 3.13.5、numpy 2.5.4、scipy 1.18.1（只用這三個；邏輯迴歸用 numpy IRLS，McNemar 用 scipy）。
+先以 Git clone 此修正分支。需要完整 Git 歷史以讀取基準 110ec47a。Windows clone 時加上 `git -c core.autocrlf=false clone ...`，避免改變已公布檔的位元組。以下命令在專案根目錄執行。修正版測試使用 Python 3.10.5、NumPy 2.2.6、SciPy 1.15.3。
 
-## 1. 資料
-repo 不含 FinMind 原始檔與截斷檔（FinMind 條款不允許再散布）。請自行用 FinMind API 抓下列資料集，存到 repo 內 `data/finmind/`（檔名見 `data/MANIFEST.json`；資料檔不進 git，見 .gitignore），sha256 必須等於 MANIFEST 所記：
-- TaiwanStockPrice（data_id=TAIEX）：ee85a934…
-- TaiwanFuturesInstitutionalInvestors（TX）：ba5b116d…
-- TaiwanStockTotalInstitutionalInvestors：847865ab…
-- TaiwanStockPrice（data_id=0050，交易模擬用）：7419fbe1…
+## 只有公開倉庫
 
-抓到的檔若 sha 不同（FinMind 事後修資料），程式會 rc=1 停下；此時只能比對彙總，無法逐位元重現。
+~~~sh
+python -m pip install -r requirements-v104.txt
+python -B -X utf8 src/reproduce.py public
+python -B -X utf8 -m unittest discover -s src -p "test_*.py" -v
+~~~
 
-## 2. 指令（全部不收參數；export PYTHONDONTWRITEBYTECODE=1）
-```
-python3 src/make_dev_slice.py      # 讀原檔一次，寫 data/dev/*.json（只到 2024-12-31）
-python3 src/leak_test.py           # 防偷看 50 個目標日 → results/v1.0.3b/leak_test.txt
-python3 src/backtest.py            # 主程式 → results/v1.0.3b/
-bash src/run_twice.sh              # 兩次重跑逐位元比對，rc=0
-```
+public 將 14 個發布檔逐一與基準 Git blob 比對。合成測試不讀取行情。舊版的方法及原始指引可用 git show 110ec47a:METHOD.md 和 git show 110ec47a:REPRODUCE.md 查閱。
 
-## 3. 常數（src/common.py 頂端，唯一一處）
-SCORE_START=2020-01-02、DEV_END=2024-12-31、HOLDOUT_START=2025-01-01；TRAIN=750、TEST=20、STEP=20、PURGE=1。
+## 私有開發期輸入
 
-## 4. predictions.csv 欄位
-date（目標日 D）, m0_pred（1=漲）, lr_pred（M2，1=漲 0=跌，p≥0.5 猜漲）, lr_prob_up（M2 上漲機率）, fold_id（對到 steps.csv）, m3_pred, m4_pred（只在各自副表期間有值；主表日、未湊滿 750 天、missing 留空）。不含實際漲跌、對錯、close、特徵；請用自己抓的 FinMind TAIEX close 對答案（y_D=1 若 close_D>close_{D−1}，平盤算錯）。
+四個 JSON 都由有授權的資料保管人先行隔離，每個檔最晚 2024-12-31，使用 MANIFEST 裡三個 data/dev/ 的檔名，及 0050 的原檔名。它們放在同一個專用目錄。請勿指定含完整跨期 FinMind 檔的目錄。新版切片入口在開檔前停止。下載相同資料集不代表能取得相同快照。
+
+## A — Exact Reproduction，核對 v1.0.3b
+
+使用原記錄的 Python 3.13.5、NumPy 2.5.4、SciPy 1.18.1 及相符的數值環境。資料保管人另提供原檔雜湊 JSON，內容是四個原始檔名對應完整小寫 SHA-256 的物件，並附 GPG detached signature（檔名為 JSON 路徑加 .sig）。金鑰須由獨立可信管道確認。需要 gpgv。保管人核對完整原檔的工作屬另一授權環境，本審查只讀簽章與已隔離開發檔。
+
+~~~sh
+python src/reproduce.py exact --inputs /private/pinned-dev --custody /private/originals.json --keyring /trusted/custodian.gpg
+~~~
+
+程式比對簽章內四個原始 SHA、三個截斷檔與 0050 SHA、原發布程式 SHA、METHOD SHA、套件版本。自 Git 基準提取實際的舊版程式到兩個乾淨目錄，分別執行 50 次替換測試及回測。A/B 所有產物必須逐位元一致，再逐檔比較原倉庫公布的 14 個輸出。原本沒有公開的內部標籤、報告、防漏紀錄只能做 A/B 比對。缺少任何前置條件時，不能認定 Exact 成功。
+
+## B — Numerical Reproduction，核對修正版
+
+另需一套已知 SHA 的原版開發切片作為市場數值的參照。候選資料包須由保管人聲明只涵蓋開發期，並隨附 development-inputs.json，以各檔名為鍵，值為含 source、last、sha256 的物件。last 使用 YYYY-MM-DD。先核對該清單再讀候選檔。不能把混合期間的原檔放進這個目錄。
+
+~~~sh
+python src/reproduce.py numerical --inputs /private/candidate-dev --reference /private/pinned-dev
+python src/reproduce.py corrected --inputs /private/pinned-dev
+~~~
+
+數值模式整理日期、欄位、數字和排序，逐一比對模型使用的價格及法人值、識別碼、交易日與缺漏。它在兩個隔離目錄重算模型，再與以參照切片跑的修正版比較所有日期、實際標籤、六模型方向和 M2 機率。數值容差為 abs_tol=1e-9、rel_tol=1e-12，日期與方向精確比對。僅有舊版公開的七欄預測不足以完成這項驗證。模式 A 與 B 使用不同的判定標準。
+
+每次執行建立新的暫存根目錄，主控台印出其位置。兩次執行使用獨立子行程、來源副本、輸入與輸出，套件則使用同一套指定直譯器。bash src/run_twice.sh 可接受上述同一組 mode 及參數。修正版 A/output/ 包含報表，internal_actuals.csv 及私有逐日輸出不得提交 GitHub。可另執行 python src/audit_outputs.py /private/A/output 檢查逐筆重彙總。
