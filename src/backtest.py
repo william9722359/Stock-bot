@@ -12,7 +12,7 @@ import common as C
 
 FUT_TAX = 0.00002   # 期交稅十萬分之二，每趟進出各一次（假設、待核）
 ETF_FEE, ETF_TAX, LS_FEES, SLIPS, TARGET = 0.001425, 0.001, (0.0, 0.0001, 0.0005), (0.0, 0.0002), 0.586
-PUBLIC_COLS = ["date", "m0_pred", "lr_pred", "lr_prob_up", "fold_id", "m3_pred", "m4_pred"]   # 公開預測檔 7 欄
+PUBLIC_COLS = ["date", "fold_id", "m0_pred", "m1_pred", "m2_pred", "m2_prob_up", "m3_pred", "m4_pred", "m5_pred", "model_version"]   # v1.0.4 公開預測檔 10 欄（飛行浩 §9）；不含行情、不含實際漲跌
 CAL_BINS = 10
 
 ZERO_DIVISION = "undefined"   # v1.0.4 F：分母為 0 → 無法定義（輸出「無法計算」），不當 0 分；分母 > 0 而值為 0 → 輸出 0
@@ -195,9 +195,9 @@ def main():
     wcsv("steps_sub.csv", sub_rows)
     s3, s4 = set(tables["副表_M3"][1]), set(tables["副表_M4"][1])
     def cell(i, m, S):   # 主表日、未湊滿 750 天、當天 missing → 空字串
-        if i not in S or pred[i][m] is None: return ""
+        if (S is not None and i not in S) or pred[i][m] is None: return ""
         return pred[i][m]
-    pub = [dict(zip(PUBLIC_COLS, (dates[i], pred[i]["M0"], pred[i]["M2"], pred[i]["p2"], pred[i]["round"], cell(i, "M3", s3), cell(i, "M4", s4)))) for i in sc]
+    pub = [dict(zip(PUBLIC_COLS, (dates[i], pred[i]["round"], pred[i]["M0"], cell(i, "M1", None), cell(i, "M2", None), pred[i]["p2"], cell(i, "M3", s3), cell(i, "M4", s4), cell(i, "M5", None), C.VERSION))) for i in sc]
     wcsv("predictions.csv", pub)   # 表頭即欄位清單（chk2 要求第一列逐字等於表頭），欄位說明見 REPRODUCE.md
     wcsv("internal/predictions_internal.csv", [{"date": dates[i], "round": pred[i]["round"], "model": m, "prob_up": (pred[i]["p2"] if m == "M2" else "不適用"),
             "pred": ("missing" if pred[i][m] is None else pred[i][m]), "actual": y[i]} for i in sc for m in C.MODELS])
