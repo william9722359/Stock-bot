@@ -12,7 +12,7 @@ import common as C
 
 FUT_TAX = 0.00002   # 期交稅十萬分之二，每趟進出各一次（假設、待核）
 ETF_FEE, ETF_TAX, LS_FEES, SLIPS, TARGET = 0.001425, 0.001, (0.0, 0.0001, 0.0005), (0.0, 0.0002), 0.586
-PUBLIC_COLS = ["date", "fold_id", "m0_pred", "m1_pred", "m2_pred", "m2_prob_up", "m3_pred", "m4_pred", "m5_pred", "model_version"]   # v1.0.4 公開預測檔 10 欄（飛行浩 §9）；不含行情、不含實際漲跌
+PUBLIC_COLS = ["date", "fold_id", "m0_pred", "m1_pred", "m2_pred", "m2_prob_up", "m3_pred", "m4_pred", "m5_pred", "model_version"]   # v1.0.4 公開預測檔 10 欄（外部審查規格 §9）；不含行情、不含實際漲跌
 CAL_BINS = 10
 
 ZERO_DIVISION = "undefined"   # v1.0.4 F：分母為 0 → 無法定義（輸出「無法計算」），不當 0 分；分母 > 0 而值為 0 → 輸出 0
@@ -153,7 +153,7 @@ def main():
                                s1["tr"][key][1] is not None and sh0 is not None and s1["tr"][key][1] > sh0)
     # v1.0.4 E 副表：條件 3 改用可交易成本（0050 只做多／空手，手續費買賣各 0.1425%、證交稅 0.1%）重算；只供參考，不參與判定（裁示 1）。
     side3 = []
-    def bh(ev, sl):   # 買進持有（飛行浩 §6 第 318 行要求）：首日開盤買一次、末日收盤賣一次，買賣手續費各 0.1425%、賣出證交稅 0.1%、滑價各一次；未還原權息
+    def bh(ev, sl):   # 買進持有（外部審查規格 §6 第 318 行要求）：首日開盤買一次、末日收盤賣一次，買賣手續費各 0.1425%、賣出證交稅 0.1%、滑價各一次；未還原權息
         o, c = etf[dates[ev[0]]][0], etf[dates[ev[-1]]][1]
         return float(c / o * (1 - ETF_FEE - sl) * (1 - ETF_FEE - ETF_TAX - sl) - 1)
     def bhs(ev):      # 買進持有日報酬：首日開→收，其後收→收（未扣成本，成本只在進出兩次）

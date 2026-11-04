@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""v1.0.4 B：Mode B 數值重現（Numerical Reproduction，飛行浩規格）。不保證逐位元一致，不等於 Exact Reproduction。
+"""v1.0.4 B：Mode B 數值重現（Numerical Reproduction，外部審查規格）。不保證逐位元一致，不等於 Exact Reproduction。
 輸入：環境變數 BT_ALT_TAIEX＝另一來源的 TAIEX 日線 CSV（欄位 date,open,close；date 可為 YYYY-MM-DD 或 YYYY/MM/DD）。
 做：統一日期／數值格式 → 比交易日集合與缺漏 → 比 open/close（容許相對誤差 TOL）→ 用另一來源重算標籤與 M0/M1/M2/M5（M3/M4 不依 TAIEX 收盤，沿用本 repo 法人檔）→ 比方向與 M2 機率。
 只印彙總計數與最大誤差，不印行情、不印實際漲跌。輸出 mode_b.txt 到 C.out_dir()（open 'x'）。"""
