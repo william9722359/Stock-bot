@@ -138,7 +138,7 @@ def main():
                 h0 = sum(y[i] == 1 for i in sel) / len(sel) if sel else None
                 sett.append({"table": g, "model": m, "group": nm, "n": s3["n"], "hit": s3["hit"], "BA": s3["BA"], "M0_same_days_hit": h0})
             for nm, v in st["tr"].items():
-                trad.append({"table": g, "model": m, "標的": "0050（FinMind 未還原權息）", "scenario": nm, "fees": "假設、待核",
+                trad.append({"table": g, "model": m, "標的": "0050（FinMind 未還原權息）", "scenario": nm, "fees": "假設、待核", "可交易性": "概念性、不可交易：0050 不能以期交稅成本放空（v1.0.4 E）" if nm.startswith("多空") else "可交易（現股只做多／空手）",
                              "PF": v[0], "Sharpe": v[1], "CAGR": v[2], "MDD": v[3]})
     mc, ps = [], []
     for g, m in family:
@@ -151,6 +151,17 @@ def main():
         key = "多空_每趟費0.0001_滑價0.0"; sh0 = tm([ret(1, etf[dates[i]], "LS", 0.0001, 0.0) for i in ev])[1]
         verdict[f"{g}|{m}"] = (s1["hit"] > m0["hit"] and q is not None and q < 0.05, sum(a > z for a, z in zip(s1["sub"], m0sub)) >= 2,
                                s1["tr"][key][1] is not None and sh0 is not None and s1["tr"][key][1] > sh0)
+    # v1.0.4 E 副表：條件 3 改用可交易成本（0050 只做多／空手，手續費買賣各 0.1425%、證交稅 0.1%）重算；只供參考，不參與判定（裁示 1）。
+    side3 = []
+    for g, m in family:
+        ev = res[(g, m)]["ev"]
+        for nm, kd, f, sl in scen:
+            if kd != "ETF": continue
+            r_m = [ret(pred[i][m], etf[dates[i]], "ETF", f, sl) for i in ev]; r_0 = [ret(1, etf[dates[i]], "ETF", f, sl) for i in ev]
+            a_, b_ = tm(r_m), tm(r_0)
+            side3.append({"table": g, "model": m, "scenario": nm, "n": len(ev), "Sharpe_model": a_[1], "Sharpe_M0全做多": b_[1],
+                          "總報酬_model": float(np.prod(1 + np.asarray(r_m)) - 1), "總報酬_M0全做多": float(np.prod(1 + np.asarray(r_0)) - 1),
+                          "總報酬_空手": 0.0, "model勝M0": a_[1] is not None and b_[1] is not None and a_[1] > b_[1], "參與判定": "否（副表）"})
     mcr = [{"family": "Holm 5 檢定（r4c §7）", "table": r[0], "pair": f"{r[1]}>M0", "test": "單尾精確McNemar", "n": r[2], "b": r[3], "c": r[4], "p": r[5], "p_holm": r[6]} for r in mc]
     R = C.out_dir(); os.makedirs(os.path.join(R, "internal"), exist_ok=True)
     def wcsv(name, rows, head=None):
@@ -158,7 +169,7 @@ def main():
             if head: fh.write(head)
             w = csv.DictWriter(fh, fieldnames=list(rows[0].keys())); w.writeheader(); [w.writerow({k: fmt(v) for k, v in r.items()}) for r in rows]
     wcsv("summary.csv", summ); wcsv("trading.csv", trad); wcsv("mcnemar.csv", mcr); wcsv("confusion.csv", cmr)
-    wcsv("yearly.csv", yr); wcsv("prf.csv", prf); wcsv("calibration.csv", calib); wcsv("settlement.csv", sett); wcsv("missing.csv", missing); wcsv("coverage.csv", coverage)
+    wcsv("yearly.csv", yr); wcsv("prf.csv", prf); wcsv("calibration.csv", calib); wcsv("settlement.csv", sett); wcsv("missing.csv", missing); wcsv("coverage.csv", coverage); wcsv("verdict_cond3_tradable.csv", side3)
     K = ("fold_id", "train_start", "train_end", "train_n", "purge_dates", "test_start", "test_end", "test_n")
     wcsv("steps.csv", [dict(zip(K, s)) for s in steps])
     sub_rows = []
