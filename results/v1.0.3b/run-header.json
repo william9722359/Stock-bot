@@ -1,0 +1,92 @@
+{
+ "M4_note": "M4 期貨腿＝外資多空交易口數淨額（不是 M3 的淨未平倉變化）；現貨腿只用 Foreign_Investor，不含外資自營商；單位待核；公布時刻待核",
+ "M5": "已實作（見 METHOD.md §3）",
+ "brier_M2": {
+  "主表": 0.2531797587124519,
+  "副表_M3": 0.2534243811491397,
+  "副表_M4": 0.25337131281155567
+ },
+ "fees": "假設、待核（含期交稅十萬分之二×2、手續費、證交稅）",
+ "first_oos": "2020-01-02",
+ "first_scoring_day": {
+  "M3": "2021-07-06",
+  "M4": "2021-07-05",
+  "主表": "2020-01-02"
+ },
+ "flat_rule": "平盤計入分母算錯；BA 只用漲、跌 Recall 平均；混淆矩陣 3×2",
+ "holdout": "2025-01-01 以後本版不讀、不跑",
+ "label": "FinMind・回測練習（不算正式成績）；未審初版、紙上、非投資建議",
+ "leak_test": "PASS",
+ "numpy": "2.5.4",
+ "params": {
+  "C_L2": 1.0,
+  "DEV_END": "2024-12-31",
+  "HOLDOUT_START": "2025-01-01",
+  "IRLS_MAX": 100,
+  "IRLS_TOL": 1e-10,
+  "PURGE": 1,
+  "SCORE_START": "2020-01-02",
+  "STEP": 20,
+  "TEST": 20,
+  "TRAIN": 750,
+  "window_meaning": "750 日訓練窗、20 日測試、每次往前 20 日、purge 1"
+ },
+ "program_sha": {
+  "backtest.py": "f775ef6535388fb0787fbba06dedc460a8cf85bc5dcf4406e1bca2fc60a15b3e",
+  "common.py": "4b7aa25abfb0b1bbd8eab0340c0b40530998aa38015bbd4dc90c199c7da286bb",
+  "leak_test.py": "cf35d5106f2b4f70f694ca2233d880d777a8c2c5adac0ee601c5e7b0503e9ba7",
+  "make_dev_slice.py": "8089abc93f18c609366ae5773af1d9bf43c79edf291ecbb1b85871e1e3e98734"
+ },
+ "python": "3.13.5",
+ "scipy": "1.18.1",
+ "scoring_window_rows": 1216,
+ "settlement": "結算日＝第三個星期三、非交易日順延（假設、待核）；settlement.csv 為分表、不改判準",
+ "sha": {
+  "ETF0050": "7419fbe175e520566b68d3f99262943279a1e3377e4573d23d4d201219327344",
+  "INST_dev": "238be435804cfa86ce6782102f5c407c94c7acfc80f610a7fa1db8d761d7a593",
+  "METHOD": "941e832df562a6854d880490e990bd1cd734356495c8d663006f83843a0c15a9",
+  "SPOT_dev": "807e695b5619b93db9634de4ee6e8cad66398e8c30eee732cf86150be7886f67",
+  "TAIEX_dev": "ffb8d6d3d7da818d85c89196705a198c4d4aaa3f6d16bf5b6bacace6cfe1350d"
+ },
+ "sklearn": "未安裝（M2 用 numpy IRLS 自寫）",
+ "steps": 61,
+ "tables": {
+  "主表": {
+   "first": "2020-01-02",
+   "last": "2024-12-31",
+   "models": [
+    "M0",
+    "M1",
+    "M2",
+    "M5"
+   ],
+   "n": 1216
+  },
+  "副表_M3": {
+   "first": "2021-07-06",
+   "last": "2024-12-31",
+   "models": [
+    "M0",
+    "M1",
+    "M2",
+    "M3"
+   ],
+   "n": 852
+  },
+  "副表_M4": {
+   "first": "2021-07-05",
+   "last": "2024-12-31",
+   "models": [
+    "M0",
+    "M1",
+    "M2",
+    "M4"
+   ],
+   "n": 853
+  }
+ },
+ "target": "交易模擬標的 0050（FinMind、未還原權息），D 日開盤進、收盤出；方向指標用加權指數；預測與交易分開",
+ "total_rows_taiex_dev": 6451,
+ "unseal": "開發期 2020–2024 評分；2025 起不讀",
+ "version": "v1.0.3b"
+}

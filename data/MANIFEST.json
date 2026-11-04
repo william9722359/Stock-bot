@@ -1,0 +1,76 @@
+[
+ {
+  "path": "data/finmind/finmind-TaiwanStockPrice-TAIEX.json",
+  "source": "FinMind TaiwanStockPrice TAIEX",
+  "fetched": "2026-10-23 11:32:31 CST",
+  "rows": 6888,
+  "first": "1999-01-05",
+  "last": "2026-10-22",
+  "sha256": "ee85a934aa8ba0d99ea978bcbacc2d1c05aa4337d49fad54b9f880acff3af6a8",
+  "in_git": false
+ },
+ {
+  "path": "data/finmind/finmind-TaiwanFuturesInstitutionalInvestors-TX.json",
+  "source": "FinMind TaiwanFuturesInstitutionalInvestors TX",
+  "fetched": "2026-10-23 11:32:54 CST",
+  "rows": 6126,
+  "first": "2018-06-05",
+  "last": "2026-10-22",
+  "sha256": "ba5b116daba9a357917336695956232ca4bd6cd2fe6d2a83f00f1ef05e992467",
+  "in_git": false
+ },
+ {
+  "path": "data/finmind/finmind-TaiwanStockPrice-0050-20030101-20241231.json",
+  "source": "FinMind TaiwanStockPrice 0050（免金鑰公開端點）",
+  "fetched": "fetched 2026-11-04 01:14:42",
+  "rows": 5304,
+  "first": "2003-06-30",
+  "last": "2024-12-31",
+  "sha256": "7419fbe175e520566b68d3f99262943279a1e3377e4573d23d4d201219327344",
+  "in_git": false
+ },
+ {
+  "path": "data/snapshots/post-DG11672-20261101T001227.csv",
+  "source": "TWSE FMTQIK open_data（DG11672）",
+  "fetched": "見檔名 20261101T001227",
+  "rows": 20,
+  "first": "1151001",
+  "last": "1151030",
+  "sha256": "822ba6bc79e23577de6e9e0ef71d55662fd1c9fdf293ae7fa522bbb8686523c1",
+  "in_git": false
+ },
+ {
+  "path": "data/dev/finmind-TaiwanStockPrice-TAIEX.json",
+  "source": "make_dev_slice.py 由原檔 ee85a934 截斷，只留 date<=2024-12-31",
+  "made": "2026-11-04 01:27:09 CST（stat）",
+  "rows": 6451,
+  "sha256": "ffb8d6d3d7da818d85c89196705a198c4d4aaa3f6d16bf5b6bacace6cfe1350d",
+  "in_git": false,
+  "version": "v1.0.1"
+ },
+ {
+  "path": "data/dev/finmind-TaiwanFuturesInstitutionalInvestors-TX.json",
+  "source": "make_dev_slice.py 由原檔 ba5b116d 截斷，只留 date<=2024-12-31",
+  "made": "2026-11-04 01:27:09 CST（stat）",
+  "rows": 4815,
+  "sha256": "238be435804cfa86ce6782102f5c407c94c7acfc80f610a7fa1db8d761d7a593",
+  "in_git": false,
+  "version": "v1.0.1"
+ },
+ {
+  "path": "data/dev/finmind-TaiwanStockTotalInstitutionalInvestors.json",
+  "source": "make_dev_slice.py 由原檔 847865ab 截斷，只留 date<=2024-12-31",
+  "made": "2026-11-04 01:27:09 CST（stat）",
+  "rows": 24622,
+  "sha256": "807e695b5619b93db9634de4ee6e8cad66398e8c30eee732cf86150be7886f67",
+  "in_git": false,
+  "version": "v1.0.1"
+ },
+ {
+  "path": "src/make_dev_slice.py",
+  "role": "截斷腳本",
+  "sha256": "8089abc93f18c609366ae5773af1d9bf43c79edf291ecbb1b85871e1e3e98734",
+  "in_git": true,
+  "version": "v1.0.1"
+ }
+]
