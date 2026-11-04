@@ -2,8 +2,10 @@
 # v1.0.4 A：兩個獨立副本各自完整重跑（leak_test＋backtest，各自輸出目錄），兩次逐檔相同才 rc=0；再各自和已公布 results/<VERSION> 比（若有）。
 set -eu; export PYTHONDONTWRITEBYTECODE=1
 R=$(cd "$(dirname "$0")/.." && pwd); T=$(mktemp -d -t bt-twice-XXXX)
+# 先一次凍結快照（src、data、METHOD），A、B 都從同一快照複製，避免執行期間工作目錄被改動造成假差異
+mkdir -p "$T/S"; cp -r "$R/src" "$R/data" "$R/METHOD.md" "$T/S/"
 for X in A B; do
-  mkdir -p "$T/$X"; cp -r "$R/src" "$R/data" "$R/METHOD.md" "$T/$X/"
+  cp -r "$T/S" "$T/$X"
   ( cd "$T/$X" && BT_OUT="$T/$X/out" python3 src/leak_test.py >/dev/null && BT_OUT="$T/$X/out" python3 src/backtest.py >/dev/null )
 done
 rc=0
