@@ -167,13 +167,14 @@ def run_models(dates, closes, oi, deal, spot):
         tr = [i for i in valid if i <= t0 - 1 - PURGE][-TRAIN:]
         assert len(tr) == TRAIN and max(tr) <= t0 - 1 - PURGE
         test = list(range(t0, min(t0 + TEST, n)))
+        pbase = float(np.mean([1.0 if y[i] == 1 else 0.0 for i in tr]))   # v1.0.4 機率基準：只用當輪訓練窗上漲比例
         mdl = lr_fit(np.array([F[i] for i in tr]), np.array([1.0 if y[i] == 1 else 0.0 for i in tr]))
         for i in test:
             dp = dates[:i]; cp = closes[:i]
             assert dp[-1] < dates[i]
             p2 = lr_prob(mdl, F[i]) if F[i] is not None else None
             pred[i] = {"M0": 1, "M1": m1(cp), "M2": (None if p2 is None else (1 if p2 >= 0.5 else 0)), "p2": p2,
-                       "M3": m3(dp, oi), "M4": p4u(dp, deal, spot), "M5": p5u(cp), "round": rnd}
+                       "M3": m3(dp, oi), "M4": p4u(dp, deal, spot), "M5": p5u(cp), "round": rnd, "pbase": pbase}
         steps.append((rnd, dates[tr[0]], dates[tr[-1]], len(tr), ";".join(dates[tr[-1]+1:t0]), dates[test[0]], dates[test[-1]], len(test)))
         t0 += STEP
     return y, pred, steps

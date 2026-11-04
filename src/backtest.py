@@ -162,6 +162,18 @@ def main():
             side3.append({"table": g, "model": m, "scenario": nm, "n": len(ev), "Sharpe_model": a_[1], "Sharpe_M0全做多": b_[1],
                           "總報酬_model": float(np.prod(1 + np.asarray(r_m)) - 1), "總報酬_M0全做多": float(np.prod(1 + np.asarray(r_0)) - 1),
                           "總報酬_空手": 0.0, "model勝M0": a_[1] is not None and b_[1] is not None and a_[1] > b_[1], "參與判定": "否（副表）"})
+    # v1.0.4 機率基準（主表；目標＝收盤上漲為 1，平盤與下跌為 0，與既有 Brier 同定義）。不用測試集調任何校準器。
+    pm = {"P50固定": lambda i: 0.5, "P訓練窗上漲比例": lambda i: pred[i]["pbase"], "M2_LR": lambda i: pred[i]["p2"]}
+    prob, pdist = [], []
+    for nm, f in pm.items():
+        ev = [i for i in sc if f(i) is not None]; pv = np.clip([f(i) for i in ev], 1e-15, 1 - 1e-15); yv = np.array([1.0 if y[i] == 1 else 0.0 for i in ev])
+        prob.append({"table": "主表", "model": nm, "n": len(ev), "Brier": float(np.mean((pv - yv) ** 2)),
+                     "LogLoss": float(-np.mean(yv * np.log(pv) + (1 - yv) * np.log(1 - pv))), "mean_prob_up": float(np.mean(pv)), "frac_up": float(np.mean(yv))})
+        for b in range(CAL_BINS):
+            lo, hi = b / CAL_BINS, (b + 1) / CAL_BINS
+            sel = [k for k, p in enumerate(pv) if lo <= p < hi or (b == CAL_BINS - 1 and p >= hi)]
+            pdist.append({"model": nm, "bin_lo": lo, "bin_hi": hi, "n": len(sel), "mean_prob_up": float(np.mean(pv[sel])) if sel else None,
+                          "frac_up": float(np.mean(yv[sel])) if sel else None, "少樣本警示": "n<30 勿解讀" if len(sel) < 30 else ""})
     mcr = [{"family": "Holm 5 檢定（r4c §7）", "table": r[0], "pair": f"{r[1]}>M0", "test": "單尾精確McNemar", "n": r[2], "b": r[3], "c": r[4], "p": r[5], "p_holm": r[6]} for r in mc]
     R = C.out_dir(); os.makedirs(os.path.join(R, "internal"), exist_ok=True)
     def wcsv(name, rows, head=None):
@@ -169,7 +181,7 @@ def main():
             if head: fh.write(head)
             w = csv.DictWriter(fh, fieldnames=list(rows[0].keys())); w.writeheader(); [w.writerow({k: fmt(v) for k, v in r.items()}) for r in rows]
     wcsv("summary.csv", summ); wcsv("trading.csv", trad); wcsv("mcnemar.csv", mcr); wcsv("confusion.csv", cmr)
-    wcsv("yearly.csv", yr); wcsv("prf.csv", prf); wcsv("calibration.csv", calib); wcsv("settlement.csv", sett); wcsv("missing.csv", missing); wcsv("coverage.csv", coverage); wcsv("verdict_cond3_tradable.csv", side3)
+    wcsv("yearly.csv", yr); wcsv("prf.csv", prf); wcsv("calibration.csv", calib); wcsv("settlement.csv", sett); wcsv("missing.csv", missing); wcsv("coverage.csv", coverage); wcsv("verdict_cond3_tradable.csv", side3); wcsv("probability.csv", prob); wcsv("probability_bins.csv", pdist)
     K = ("fold_id", "train_start", "train_end", "train_n", "purge_dates", "test_start", "test_end", "test_n")
     wcsv("steps.csv", [dict(zip(K, s)) for s in steps])
     sub_rows = []
