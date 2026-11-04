@@ -88,6 +88,17 @@ def main():
     tables = {"主表": (C.MAIN, sc),
               "副表_M3": (["M0", "M1", "M2", "M3"], [i for i in sc if ks["M3"] is not None and i >= ks["M3"]]),
               "副表_M4": (["M0", "M1", "M2", "M4"], [i for i in sc if ks["M4"] is not None and i >= ks["M4"]])}
+    # v1.0.4 D：補充表（描述用，不進 Holm 家族、不參與判定）。全期＝2020-01-02 起所有評分日、模型有預測即計；共同有效日＝六模型皆有預測的日子。
+    tables["補充_全期_M3"] = (["M0", "M3"], sc)
+    tables["補充_全期_M4"] = (["M0", "M4"], sc)
+    tables["補充_共同有效日"] = (C.MODELS, [i for i in sc if all(pred[i][m] is not None for m in C.MODELS)])
+    coverage = []
+    for m in C.MODELS:
+        k = ks.get(m); none = [i for i in sc if pred[i][m] is None]
+        warm = [i for i in sc if pred[i][m] is not None and k is not None and i < k]
+        coverage.append({"model": m, "score_days": len(sc), "缺輸入_無預測": len(none), "暖機排除_有預測未計": len(warm),
+                         "棄權": 0, "無效": 0, "計入主或副表": len(sc) - len(none) - len(warm),
+                         "副表起日": dates[k] if k is not None else "不適用", "首個有預測日": next((dates[i] for i in sc if pred[i][m] is not None), "無")})
     family = [("主表", "M1"), ("主表", "M2"), ("主表", "M5"), ("副表_M3", "M3"), ("副表_M4", "M4")]   # 5 個檢定一起 Holm
     scen = [("ETF只做多_手續費0.1425%x2_稅0.1%_滑價" + str(s), "ETF", 0, s) for s in SLIPS] + \
            [(f"多空_每趟費{f}_滑價{s}", "LS", f, s) for f in LS_FEES for s in SLIPS]
@@ -147,7 +158,7 @@ def main():
             if head: fh.write(head)
             w = csv.DictWriter(fh, fieldnames=list(rows[0].keys())); w.writeheader(); [w.writerow({k: fmt(v) for k, v in r.items()}) for r in rows]
     wcsv("summary.csv", summ); wcsv("trading.csv", trad); wcsv("mcnemar.csv", mcr); wcsv("confusion.csv", cmr)
-    wcsv("yearly.csv", yr); wcsv("prf.csv", prf); wcsv("calibration.csv", calib); wcsv("settlement.csv", sett); wcsv("missing.csv", missing)
+    wcsv("yearly.csv", yr); wcsv("prf.csv", prf); wcsv("calibration.csv", calib); wcsv("settlement.csv", sett); wcsv("missing.csv", missing); wcsv("coverage.csv", coverage)
     K = ("fold_id", "train_start", "train_end", "train_n", "purge_dates", "test_start", "test_end", "test_n")
     wcsv("steps.csv", [dict(zip(K, s)) for s in steps])
     sub_rows = []
