@@ -16,7 +16,7 @@ PUBLIC_COLS = ["date", "m0_pred", "lr_pred", "lr_prob_up", "fold_id", "m3_pred",
 CAL_BINS = 10
 
 ZERO_DIVISION = "undefined"   # v1.0.4 F：分母為 0 → 無法定義（輸出「無法計算」），不當 0 分；分母 > 0 而值為 0 → 輸出 0
-def prf(tp, fp, fn):
+def prf_counts(tp, fp, fn):
     """P=TP/(TP+FP)、R=TP/(TP+FN)、F1=2TP/(2TP+FP+FN)（與 2PR/(P+R) 在 P、R 皆有定義時相同）。分母為 0 → None。"""
     pr = tp / (tp + fp) if tp + fp > 0 else None
     rc = tp / (tp + fn) if tp + fn > 0 else None
@@ -32,7 +32,7 @@ def stats(yv, pv):
     rec = {}
     for pos, nm in ((1, "up"), (0, "dn")):
         tp = cm[(pos, pos)]; fp = sum(cm[(a, pos)] for a in (1, 0, -1) if a != pos); fn = cm[(pos, 1 - pos)]
-        pr, rc, f1 = prf(tp, fp, fn)
+        pr, rc, f1 = prf_counts(tp, fp, fn)
         rec[nm] = rc; o.update({nm + "_TP": tp, nm + "_FP": fp, nm + "_FN": fn, nm + "_P": pr, nm + "_R": rc, nm + "_F1": f1})
     o["BA"] = (rec["up"] + rec["dn"]) / 2 if rec["up"] is not None and rec["dn"] is not None else None
     return o
