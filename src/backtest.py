@@ -15,6 +15,14 @@ ETF_FEE, ETF_TAX, LS_FEES, SLIPS, TARGET = 0.001425, 0.001, (0.0, 0.0001, 0.0005
 PUBLIC_COLS = ["date", "m0_pred", "lr_pred", "lr_prob_up", "fold_id", "m3_pred", "m4_pred"]   # 公開預測檔 7 欄
 CAL_BINS = 10
 
+ZERO_DIVISION = "undefined"   # v1.0.4 F：分母為 0 → 無法定義（輸出「無法計算」），不當 0 分；分母 > 0 而值為 0 → 輸出 0
+def prf(tp, fp, fn):
+    """P=TP/(TP+FP)、R=TP/(TP+FN)、F1=2TP/(2TP+FP+FN)（與 2PR/(P+R) 在 P、R 皆有定義時相同）。分母為 0 → None。"""
+    pr = tp / (tp + fp) if tp + fp > 0 else None
+    rc = tp / (tp + fn) if tp + fn > 0 else None
+    f1 = 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn > 0 else None
+    return pr, rc, f1
+
 def stats(yv, pv):
     """3×2 混淆矩陣（實際 漲/跌/平 × 預測 漲/跌）；平盤計入分母算錯；BA 只用漲、跌兩類 Recall。"""
     n = len(yv); cm = {(a, p): 0 for a in (1, 0, -1) for p in (1, 0)}
@@ -24,8 +32,7 @@ def stats(yv, pv):
     rec = {}
     for pos, nm in ((1, "up"), (0, "dn")):
         tp = cm[(pos, pos)]; fp = sum(cm[(a, pos)] for a in (1, 0, -1) if a != pos); fn = cm[(pos, 1 - pos)]
-        pr = tp / (tp + fp) if tp + fp else None; rc = tp / (tp + fn) if tp + fn else None
-        f1 = 2 * pr * rc / (pr + rc) if pr and rc else None
+        pr, rc, f1 = prf(tp, fp, fn)
         rec[nm] = rc; o.update({nm + "_TP": tp, nm + "_FP": fp, nm + "_FN": fn, nm + "_P": pr, nm + "_R": rc, nm + "_F1": f1})
     o["BA"] = (rec["up"] + rec["dn"]) / 2 if rec["up"] is not None and rec["dn"] is not None else None
     return o

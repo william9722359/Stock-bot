@@ -41,6 +41,7 @@ FinMind 資料的回測練習，不算正式成績。紙上計算，非投資建
 
 ## 4. 指標
 - 命中率；以漲、跌各自為正類的 Precision、Recall、F1。
+- zero_division 政策（v1.0.4 起）：P = TP/(TP+FP)，R = TP/(TP+FN)，F1 = 2TP/(2TP+FP+FN)。分母為 0 時該指標「無法計算」（不當 0 分、不當 1 分）；分母大於 0 而分子為 0 時記 0。因此「全猜漲」模型的跌類 F1 記 0（v1.0.3b 記「無法計算」，因舊式 2PR/(P+R) 在 P 無法定義時連帶失效）。此改變只影響 F1 欄的「無法計算／0」表示，不影響命中率、BA、判定。
 - 3×2 混淆矩陣（實際 漲／跌／平 × 預測 漲／跌）。Balanced Accuracy =（上漲 Recall + 下跌 Recall）/ 2，平盤日另外列出。
 - 每年 Accuracy 與 Balanced Accuracy；M2 的 10 等寬區間校準表與 Brier 分數。
 - 檢定：M1、M2、M5（主表）與 M3、M4（副表）各自對 M0，做單尾精確 McNemar。
