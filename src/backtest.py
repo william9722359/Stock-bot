@@ -153,14 +153,21 @@ def main():
                                s1["tr"][key][1] is not None and sh0 is not None and s1["tr"][key][1] > sh0)
     # v1.0.4 E 副表：條件 3 改用可交易成本（0050 只做多／空手，手續費買賣各 0.1425%、證交稅 0.1%）重算；只供參考，不參與判定（裁示 1）。
     side3 = []
+    def bh(ev, sl):   # 買進持有（飛行浩 §6 第 318 行要求）：首日開盤買一次、末日收盤賣一次，買賣手續費各 0.1425%、賣出證交稅 0.1%、滑價各一次；未還原權息
+        o, c = etf[dates[ev[0]]][0], etf[dates[ev[-1]]][1]
+        return float(c / o * (1 - ETF_FEE - sl) * (1 - ETF_FEE - ETF_TAX - sl) - 1)
+    def bhs(ev):      # 買進持有日報酬：首日開→收，其後收→收（未扣成本，成本只在進出兩次）
+        r = [etf[dates[ev[0]]][1] / etf[dates[ev[0]]][0] - 1] + [etf[dates[b]][1] / etf[dates[a]][1] - 1 for a, b in zip(ev, ev[1:])]
+        return tm(r)[1]
     for g, m in family:
         ev = res[(g, m)]["ev"]
         for nm, kd, f, sl in scen:
             if kd != "ETF": continue
             r_m = [ret(pred[i][m], etf[dates[i]], "ETF", f, sl) for i in ev]; r_0 = [ret(1, etf[dates[i]], "ETF", f, sl) for i in ev]
             a_, b_ = tm(r_m), tm(r_0)
-            side3.append({"table": g, "model": m, "scenario": nm, "n": len(ev), "Sharpe_model": a_[1], "Sharpe_M0全做多": b_[1],
-                          "總報酬_model": float(np.prod(1 + np.asarray(r_m)) - 1), "總報酬_M0全做多": float(np.prod(1 + np.asarray(r_0)) - 1),
+            side3.append({"table": g, "model": m, "scenario": nm, "n": len(ev), "Sharpe_model": a_[1], "Sharpe_M0每日開盤買收盤賣": b_[1],
+                          "總報酬_model": float(np.prod(1 + np.asarray(r_m)) - 1), "總報酬_M0每日開盤買收盤賣": float(np.prod(1 + np.asarray(r_0)) - 1),
+                          "總報酬_買進持有0050": bh(ev, sl), "Sharpe_買進持有0050": bhs(ev),
                           "總報酬_空手": 0.0, "model勝M0": a_[1] is not None and b_[1] is not None and a_[1] > b_[1], "參與判定": "否（副表）"})
     # v1.0.4 機率基準（主表；目標＝收盤上漲為 1，平盤與下跌為 0，與既有 Brier 同定義）。不用測試集調任何校準器。
     pm = {"P50固定": lambda i: 0.5, "P訓練窗上漲比例": lambda i: pred[i]["pbase"], "M2_LR": lambda i: pred[i]["p2"]}
