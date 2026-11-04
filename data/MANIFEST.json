@@ -7,7 +7,8 @@
   "first": "1999-01-05",
   "last": "2026-10-22",
   "sha256": "ee85a934aa8ba0d99ea978bcbacc2d1c05aa4337d49fad54b9f880acff3af6a8",
-  "in_git": false
+  "in_git": false,
+  "產生方法": "FinMind API 下載原檔，未改動（下載腳本不在本 repo）"
  },
  {
   "path": "data/finmind/finmind-TaiwanFuturesInstitutionalInvestors-TX.json",
@@ -17,7 +18,8 @@
   "first": "2018-06-05",
   "last": "2026-10-22",
   "sha256": "ba5b116daba9a357917336695956232ca4bd6cd2fe6d2a83f00f1ef05e992467",
-  "in_git": false
+  "in_git": false,
+  "產生方法": "FinMind API 下載原檔，未改動（下載腳本不在本 repo）"
  },
  {
   "path": "data/finmind/finmind-TaiwanStockPrice-0050-20030101-20241231.json",
@@ -27,7 +29,19 @@
   "first": "2003-06-30",
   "last": "2024-12-31",
   "sha256": "7419fbe175e520566b68d3f99262943279a1e3377e4573d23d4d201219327344",
-  "in_git": false
+  "in_git": false,
+  "產生方法": "FinMind API 下載原檔，未改動（下載腳本不在本 repo）"
+ },
+ {
+  "path": "data/finmind/finmind-TaiwanStockTotalInstitutionalInvestors.json",
+  "source": "FinMind TaiwanStockTotalInstitutionalInvestors",
+  "fetched": "未記錄（UNVERIFIED；v1.0.3b MANIFEST 漏列，v1.0.4 補登）",
+  "rows": 27244,
+  "first": "2004-04-07",
+  "last": "2026-10-22",
+  "sha256": "847865abfbdcedd6f538adaafd6efcd404f2f8c6d0e2e0f527f1ae83c48e7f5e",
+  "in_git": false,
+  "產生方法": "FinMind API 下載原檔，未改動（下載腳本不在本 repo）"
  },
  {
   "path": "data/snapshots/post-DG11672-20261101T001227.csv",
@@ -37,7 +51,8 @@
   "first": "1151001",
   "last": "1151030",
   "sha256": "822ba6bc79e23577de6e9e0ef71d55662fd1c9fdf293ae7fa522bbb8686523c1",
-  "in_git": false
+  "in_git": false,
+  "產生方法": "TWSE open_data 下載快照，未改動"
  },
  {
   "path": "data/dev/finmind-TaiwanStockPrice-TAIEX.json",
@@ -46,7 +61,8 @@
   "rows": 6451,
   "sha256": "ffb8d6d3d7da818d85c89196705a198c4d4aaa3f6d16bf5b6bacace6cfe1350d",
   "in_git": false,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "產生方法": "src/make_dev_slice.py 讀原檔、只留 date<=2024-12-31 後以固定格式寫出"
  },
  {
   "path": "data/dev/finmind-TaiwanFuturesInstitutionalInvestors-TX.json",
@@ -55,7 +71,8 @@
   "rows": 4815,
   "sha256": "238be435804cfa86ce6782102f5c407c94c7acfc80f610a7fa1db8d761d7a593",
   "in_git": false,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "產生方法": "src/make_dev_slice.py 讀原檔、只留 date<=2024-12-31 後以固定格式寫出"
  },
  {
   "path": "data/dev/finmind-TaiwanStockTotalInstitutionalInvestors.json",
@@ -64,13 +81,15 @@
   "rows": 24622,
   "sha256": "807e695b5619b93db9634de4ee6e8cad66398e8c30eee732cf86150be7886f67",
   "in_git": false,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "產生方法": "src/make_dev_slice.py 讀原檔、只留 date<=2024-12-31 後以固定格式寫出"
  },
  {
   "path": "src/make_dev_slice.py",
   "role": "截斷腳本",
   "sha256": "8089abc93f18c609366ae5773af1d9bf43c79edf291ecbb1b85871e1e3e98734",
   "in_git": true,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "產生方法": "程式檔（記錄其 sha 供重現）"
  }
 ]
