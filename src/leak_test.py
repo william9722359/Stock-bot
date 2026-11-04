@@ -17,7 +17,7 @@ for k in ks:
     _, p, _ = C.run_models(dates, c2, o2, d2, s2)
     bad = [dates[i] for i in keys if i <= k and p[i] != base[i]]
     if bad: fails.append((dates[k], bad[:3]))
-out = os.path.join(C.ROOT, "results", C.VERSION, "leak_test.txt"); os.makedirs(os.path.dirname(out), exist_ok=True)
+out = os.path.join(C.out_dir(), "leak_test.txt"); os.makedirs(os.path.dirname(out), exist_ok=True)
 with open(out, "x") as fh:
     fh.write(("PASS" if not fails else "FAIL") + f" 50 個 k，失敗 {len(fails)}；k={[dates[k] for k in ks]}；{fails}\n")
 print("PASS" if not fails else "FAIL", len(fails)); sys.exit(0 if not fails else 1)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """stockbot-backtest 開發期回測（750/20/20、purge 1；方法見 METHOD.md）。紙上計算、非投資建議。
-不收參數；常數寫死在 common.py。只讀 data/dev 截斷檔。輸出寫 ROOT/results/<VERSION>/（open 'x'，不覆寫）。"""
+不收參數；常數寫死在 common.py。只讀 data/dev 截斷檔。輸出寫 C.out_dir()（預設 runs/<VERSION>，open 'x'，不覆寫；從不寫 results/）。"""
 import sys, os, json, math, csv, platform, datetime as dt
 if len(sys.argv) > 1:
     sys.stderr.write("拒絕：本程式不收任何參數\n"); sys.exit(2)
@@ -134,7 +134,7 @@ def main():
         verdict[f"{g}|{m}"] = (s1["hit"] > m0["hit"] and q is not None and q < 0.05, sum(a > z for a, z in zip(s1["sub"], m0sub)) >= 2,
                                s1["tr"][key][1] is not None and sh0 is not None and s1["tr"][key][1] > sh0)
     mcr = [{"family": "Holm 5 檢定（r4c §7）", "table": r[0], "pair": f"{r[1]}>M0", "test": "單尾精確McNemar", "n": r[2], "b": r[3], "c": r[4], "p": r[5], "p_holm": r[6]} for r in mc]
-    R = os.path.join(C.ROOT, "results", C.VERSION); os.makedirs(os.path.join(R, "internal"), exist_ok=True)
+    R = C.out_dir(); os.makedirs(os.path.join(R, "internal"), exist_ok=True)
     def wcsv(name, rows, head=None):
         with open(os.path.join(R, name), "x", newline="") as fh:
             if head: fh.write(head)

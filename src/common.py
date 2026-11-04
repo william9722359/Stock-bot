@@ -3,10 +3,17 @@ import json, hashlib, csv, io, os, sys
 import numpy as np
 from pathlib import Path
 
-VERSION = "v1.0.3b"
+VERSION = "v1.0.4"
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FM = str(Path(__file__).resolve().parents[1] / "data" / "finmind") + "/"
 DEV_DIR = os.path.join(ROOT, "data/dev")
+# 輸出目錄（v1.0.4 A）：程式永遠不寫 results/（已公布結果唯讀）。預設 runs/<VERSION>；可用環境變數 BT_OUT 指到別處（只影響輸出位置，不影響計算）。
+PUBLISHED = os.path.join(ROOT, "results", VERSION)
+def out_dir():
+    o = os.path.abspath(os.environ.get("BT_OUT") or os.path.join(ROOT, "runs", VERSION))
+    if o == os.path.abspath(os.path.join(ROOT, "results")) or o.startswith(os.path.abspath(os.path.join(ROOT, "results")) + os.sep):
+        die("拒絕：輸出目錄不可在 results/ 底下（已公布結果唯讀）")
+    return o
 # 原檔（只有 make_dev_slice.py 讀）
 ORIG = {"finmind-TaiwanStockPrice-TAIEX": (FM + "finmind-TaiwanStockPrice-TAIEX.json", "ee85a934aa8ba0d99ea978bcbacc2d1c05aa4337d49fad54b9f880acff3af6a8"),
         "finmind-TaiwanFuturesInstitutionalInvestors-TX": (FM + "finmind-TaiwanFuturesInstitutionalInvestors-TX.json", "ba5b116daba9a357917336695956232ca4bd6cd2fe6d2a83f00f1ef05e992467"),
