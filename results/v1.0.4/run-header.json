@@ -33,7 +33,7 @@
   "window_meaning": "750 日訓練窗、20 日測試、每次往前 20 日、purge 1"
  },
  "program_sha": {
-  "backtest.py": "4a34c194fbe98b15e274b66a696a6dd4fbd1f76bc694f4b55e2609dae4a508b9",
+  "backtest.py": "ca1737e9a1c37a9d35ab411dee5c9d374dcc1417e6d2c657848be94e263ece27",
   "common.py": "bab186a703fa3c468339fdbba6f105c18946493b22954842b2981726be9e7307",
   "leak_test.py": "f46e7efbfc3925bf51fab5f79289e36f456552b72303f603ad7f106022f19c51",
   "make_dev_slice.py": "8089abc93f18c609366ae5773af1d9bf43c79edf291ecbb1b85871e1e3e98734"
