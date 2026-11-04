@@ -5,3 +5,4 @@
 - v1.0.3（2026-11-04）：公開預測檔欄值檢查。
 - v1.0.3a（2026-11-04）：資料路徑改 repo 內相對位置，成績不變。
 - v1.0.3b（2026-11-04）：只留重現所需檔案，加 METHOD.md，成績不變。
+- v1.0.4（2026-11-04）：外部審查修正。A：程式只寫 runs/<VERSION> 或 BT_OUT，不寫 results/；新增 compare.py；run_twice 用凍結快照、兩副本獨立重跑。F：F1＝2TP/(2TP+FP+FN)，分母 0 才「無法計算」（M0 跌類 F1 由「無法計算」改為 0）。D：coverage.csv、補充全期與共同有效日表（不進 Holm、不判定）。E：多空列標「不可交易」；判定條件 3 演算法與門檻不變，另出可交易成本副表（含每日開盤買收盤賣、空手、買進持有 0050），不判定。機率基準（固定 0.5、訓練窗上漲比例）與 Brier／LogLoss。predictions.csv 改 10 欄。B：MANIFEST 補 TotalInst 原檔紀錄與「產生方法」；mode_b.py 數值重現。C：AVAILABILITY.md（全部 UNVERIFIED，暫定回測）。新增 tests/。v1.0.3b 結果保留未改。
