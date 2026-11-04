@@ -2,7 +2,7 @@
 """stockbot-backtest 開發期回測（750/20/20、purge 1；方法見 METHOD.md）。紙上計算、非投資建議。
 不收參數；常數寫死在 common.py。只讀 data/dev 截斷檔。輸出寫 ROOT/results/<VERSION>/（open 'x'，不覆寫）。"""
 import sys, os, json, math, csv, platform, datetime as dt
-if len(sys.argv) > 1:
+if __name__ == "__main__" and len(sys.argv) > 1:
     sys.stderr.write("拒絕：本程式不收任何參數\n"); sys.exit(2)
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -10,10 +10,7 @@ import numpy as np, scipy
 from scipy.stats import binom
 import common as C
 
-FUT_TAX = 0.00002   # 期交稅十萬分之二，每趟進出各一次（假設、待核）
-ETF_FEE, ETF_TAX, LS_FEES, SLIPS, TARGET = 0.001425, 0.001, (0.0, 0.0001, 0.0005), (0.0, 0.0002), 0.586
-PUBLIC_COLS = ["date", "m0_pred", "lr_pred", "lr_prob_up", "fold_id", "m3_pred", "m4_pred"]   # 公開預測檔 7 欄
-CAL_BINS = 10
+ETF_FEE, ETF_TAX, SLIPS = 0.001425, 0.001, (0.0, 0.0002)
 
 def stats(yv, pv):
     """3×2 混淆矩陣（實際 漲/跌/平 × 預測 漲/跌）；平盤計入分母算錯；BA 只用漲、跌兩類 Recall。"""
@@ -25,7 +22,8 @@ def stats(yv, pv):
     for pos, nm in ((1, "up"), (0, "dn")):
         tp = cm[(pos, pos)]; fp = sum(cm[(a, pos)] for a in (1, 0, -1) if a != pos); fn = cm[(pos, 1 - pos)]
         pr = tp / (tp + fp) if tp + fp else None; rc = tp / (tp + fn) if tp + fn else None
-        f1 = 2 * pr * rc / (pr + rc) if pr and rc else None
+        den = 2 * tp + fp + fn
+        f1 = 2 * tp / den if den else None
         rec[nm] = rc; o.update({nm + "_TP": tp, nm + "_FP": fp, nm + "_FN": fn, nm + "_P": pr, nm + "_R": rc, nm + "_F1": f1})
     o["BA"] = (rec["up"] + rec["dn"]) / 2 if rec["up"] is not None and rec["dn"] is not None else None
     return o
@@ -40,16 +38,6 @@ def holm(ps):
     idx = sorted([i for i, p in enumerate(ps) if p is not None], key=lambda i: ps[i]); m = len(idx); out = [None] * len(ps); run = 0.0
     for k, i in enumerate(idx): run = max(run, min(1.0, (m - k) * ps[i])); out[i] = run
     return out
-
-def tm(r):
-    r = np.asarray(r, float); E = np.cumprod(1 + r); neg = r[r < 0].sum(); sd = r.std(ddof=1)
-    return (float(r[r > 0].sum() / abs(neg)) if neg < 0 else None, float(r.mean() / sd * math.sqrt(252)) if sd > 0 else None,
-            float(E[-1] ** (252 / len(r)) - 1), float(np.max(1 - E / np.maximum.accumulate(np.concatenate([[1.0], E]))[1:])))
-
-def ret(p, oc, kind, fee, slip):
-    g = oc[1] / oc[0] - 1
-    if kind == "ETF": return (g - 2 * ETF_FEE - ETF_TAX - 2 * slip) if p == 1 else 0.0
-    return (g if p == 1 else -g) - 2 * FUT_TAX - fee - 2 * slip   # 期交稅×2（假設、待核）
 
 def fmt(v):
     if v is None: return "無法計算"
@@ -70,128 +58,225 @@ def settle_days(dates):
             if d.isoformat() <= C.DEV_END: out.add(d.isoformat())
     return out
 
+
+def write_csv(folder, name, rows):
+    if not rows:
+        return
+    with (folder / name).open("x", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=rows[0])
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def status(model, i, dates, oi, deal, spot, prediction):
+    if prediction is not None:
+        return "VALID"
+    if model == "M2" and i >= 22:
+        return "INVALID"
+    if model == "M3" and i >= 2 and all(d in oi for d in dates[i-2:i]):
+        return "ABSTENTION"
+    if i < {"M1": 2, "M2": 22, "M3": 2, "M4": 1, "M5": 270}.get(model, 0):
+        return "WARM_UP"
+    return "MISSING"
+
+
+def probability_scores(rows):
+    reports, curve = [], []
+    for name, key in (("Fixed50", None), ("TrainPrior", "prior"), ("M2", "p2")):
+        p = np.array([r[key] if key else .5 for r, y in rows])
+        up = np.array([y == 1 for r, y in rows], dtype=float)
+        clipped = np.clip(p, 1e-15, 1-1e-15)
+        reports.append(dict(model=name, n=len(up), brier=np.mean((p-up)**2) if len(up) else None,
+                            log_loss=-np.mean(up*np.log(clipped)+(1-up)*np.log1p(-clipped)) if len(up) else None))
+        for b in range(10):
+            sel = np.minimum((p*10).astype(int), 9) == b
+            curve.append(dict(model=name, lower=b/10, upper=(b+1)/10, n=int(sel.sum()),
+                              mean_p=p[sel].mean() if sel.any() else None,
+                              frac_up=up[sel].mean() if sel.any() else None))
+    return reports, curve
+
+
+def feature_catalog(i, dates, oi, deal, spot):
+    """Offsets are observed trading sessions counted backwards from target D."""
+    specs=[("M0","constant","constant",0,0,True),("M1","previous_direction","TAIEX",2,1,True)]
+    specs += [("M2",f"return_lag{k}","TAIEX",k+1,k,True) for k in range(1,6)]
+    specs += [("M2","return20","TAIEX",21,1,True),("M2","vol20","TAIEX",21,1,True),
+              ("M2","deviation_ma20","TAIEX",20,1,True),
+              ("M3","oi_previous","TX foreign OI",1,1,dates[i-1] in oi),
+              ("M3","oi_two_sessions_prior","TX foreign OI",2,2,dates[i-2] in oi),
+              ("M4","net_deals","TX foreign net trades",1,1,dates[i-1] in deal),
+              ("M4","net_cash","Foreign_Investor net spot",1,1,dates[i-1] in spot),
+              ("M5","sigma20_rank250","TAIEX",270,1,True),("M5","ma60","TAIEX",60,1,True)]
+    return [dict(date=dates[i],model=m,feature=f,source=s,feature_date=dates[i-end] if end else "",
+                 coverage_start=dates[i-start] if start else "",coverage_end=dates[i-end] if end else "",
+                 publication_time="",cutoff=dates[i]+"T08:45:00+08:00",
+                 availability="VERIFIED" if m=="M0" else "UNVERIFIED" if present else "NOT AVAILABLE")
+            for m,f,s,start,end,present in specs]
+
+
+def block_interval(differences):
+    # Resample calendar-contiguous circular blocks, retaining gaps as NaN.
+    x=np.asarray(differences,float)
+    if np.isfinite(x).sum()<40: return None,None
+    rng=np.random.default_rng(104)
+    estimates=[]
+    for _ in range(2000):
+        start=rng.integers(len(x),size=(len(x)+19)//20)
+        sample=x[((start[:,None]+np.arange(20))%len(x)).ravel()[:len(x)]]
+        if np.isfinite(sample).any(): estimates.append(np.nanmean(sample))
+    return np.quantile(estimates,[.025,.975]).tolist()
+
+
+def calibration_svg(rows):
+    lines=['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 340">',
+           '<rect width="380" height="340" fill="white"/><path d="M45 20V280H305 M45 280L305 20" fill="none" stroke="#aaa"/>']
+    for j,(model,color) in enumerate((("Fixed50","#a04b12"),("TrainPrior","#008478"),("M2","#403bb3"))):
+        points=[(45+260*r["mean_p"],280-260*r["frac_up"],r["n"]) for r in rows if r["model"]==model and r["n"]]
+        coords=" ".join(f"{x:.4f},{y:.4f}" for x,y,_ in points)
+        lines.append(f'<polyline points="{coords}" stroke="{color}" fill="none"/>')
+        for x,y,n in points: lines.append(f'<circle cx="{x:.4f}" cy="{y:.4f}" r="3" fill="{color}"><title>{model} n={n}</title></circle>')
+        lines.append(f'<text x="{45+j*95}" y="325" fill="{color}">{model}</text>')
+    lines.extend(['<text x="85" y="300">Mean predicted P(UP)</text>',
+                  '<text transform="translate(18 237) rotate(-90)">Observed UP frequency</text></svg>'])
+    return "\n".join(lines)
+
+
+def etf_trade(o, c, slip):
+    if not all(math.isfinite(x) and x > 0 for x in (o, c)):
+        raise ValueError("invalid ETF price")
+    buy = o*(1+slip)
+    sell = c*(1-slip)
+    costs = dict(buy_commission=buy*ETF_FEE, sell_commission=sell*ETF_FEE,
+                 sell_tax=sell*ETF_TAX, buy_slippage=buy-o, sell_slippage=c-sell)
+    return (sell-costs["sell_commission"]-costs["sell_tax"])/(buy+costs["buy_commission"])-1, costs
+
+
+def trading(dates, etf, pred, idx):
+    metrics, curve, annual = [], [], []
+    for slip in SLIPS:
+        for model in [*C.MODELS, "Cash", "BuyHoldPriceOnly"]:
+            equity = peak = 1.
+            drawdown = 0.
+            returns, pnl, yearly = [], [], {}
+            total_cost = dict.fromkeys(("buy_commission","sell_commission","sell_tax","buy_slippage","sell_slippage"), 0.)
+            for j, i in enumerate(idx):
+                day = dates[i]
+                o, c = etf[day]
+                growth, costs = etf_trade(o, c, slip)
+                before = equity
+                yearly.setdefault(day[:4], [before, before])
+                if model == "BuyHoldPriceOnly":
+                    if j == 0:
+                        units = 1/(o*(1+slip)*(1+ETF_FEE))
+                        for k in ("buy_commission","buy_slippage"):
+                            total_cost[k] += units*costs[k]
+                    equity = units*c
+                    if j == len(idx)-1:
+                        for k in ("sell_commission","sell_tax","sell_slippage"):
+                            total_cost[k] += units*costs[k]
+                        equity = units*c*(1-slip)*(1-ETF_FEE-ETF_TAX)
+                        pnl.append(equity-1)
+                elif model != "Cash" and pred[i][model] == 1:
+                    units = equity/(o*(1+slip)*(1+ETF_FEE))
+                    for k in costs:
+                        total_cost[k] += units*costs[k]
+                    equity *= 1+growth
+                    pnl.append(equity-before)
+                returns.append(equity/before-1)
+                peak = max(peak, equity)
+                drawdown = max(drawdown, 1-equity/peak)
+                yearly[day[:4]][1] = equity
+                curve.append(dict(model=model, slip=slip, date=day, equity=equity))
+            sd = np.std(returns, ddof=1) if len(idx)>1 else 0
+            loss = -sum(x for x in pnl if x<0)
+            span = (dt.date.fromisoformat(dates[idx[-1]])-dt.date.fromisoformat(dates[idx[0]])).days+1
+            metrics.append(dict(model=model, slip=slip, total_return=equity-1, CAGR=equity**(365.2425/span)-1,
+                                Sharpe=np.mean(returns)/sd*math.sqrt(252) if sd else None, MDD=drawdown,
+                                PF=sum(x for x in pnl if x>0)/loss if loss else None, **total_cost))
+            annual.extend(dict(model=model, slip=slip, year=y, total_return=b/a-1) for y,(a,b) in yearly.items())
+    return metrics, curve, annual
+
+
 def main():
-    shas = {k: C.check(v) for k, v in dict(TAIEX_dev=C.TAIEX, INST_dev=C.INST, SPOT_dev=C.SPOT, ETF0050=C.ETF, METHOD=C.METHOD).items()}
-    dates, opens, closes = C.load_taiex(); etf = C.load_etf(); oi, deal = C.load_inst(); spot = C.load_spot()
+    from pathlib import Path
+    import tempfile
+    C.check(C.METHOD)
+    dates, _, closes = C.load_taiex()
+    oi, deal = C.load_inst()
+    spot, etf = C.load_spot(), C.load_etf()
     y, pred, steps = C.run_models(dates, closes, oi, deal, spot)
-    sc = [i for i in sorted(pred) if C.SCORE_START <= dates[i] <= C.DEV_END]; C.guard([dates[i] for i in sc])
-    for i in sc:
-        if dates[i] not in etf: C.die("0050 缺日")
-    ks = C.sub_starts(dates, oi, deal, spot)
-    tables = {"主表": (C.MAIN, sc),
-              "副表_M3": (["M0", "M1", "M2", "M3"], [i for i in sc if ks["M3"] is not None and i >= ks["M3"]]),
-              "副表_M4": (["M0", "M1", "M2", "M4"], [i for i in sc if ks["M4"] is not None and i >= ks["M4"]])}
-    family = [("主表", "M1"), ("主表", "M2"), ("主表", "M5"), ("副表_M3", "M3"), ("副表_M4", "M4")]   # 5 個檢定一起 Holm
-    scen = [("ETF只做多_手續費0.1425%x2_稅0.1%_滑價" + str(s), "ETF", 0, s) for s in SLIPS] + \
-           [(f"多空_每趟費{f}_滑價{s}", "LS", f, s) for f in LS_FEES for s in SLIPS]
-    stl = settle_days(dates)
-    summ, trad, cmr, yr, prf, calib, sett, missing = [], [], [], [], [], [], [], []
-    res = {}; briers = {}
-    for g, (models, idx) in tables.items():
-        for m in models:
-            ev = [i for i in idx if pred[i][m] is not None]
-            missing.append({"table": g, "model": m, "table_days": len(idx), "predicted": len(ev), "missing": len(idx) - len(ev),
-                            "missing_ratio": (len(idx) - len(ev)) / len(idx) if idx else None})
-            st = stats([y[i] for i in ev], [pred[i][m] for i in ev]); k = len(ev)
-            cuts = [ev[:k // 3], ev[k // 3:2 * k // 3], ev[2 * k // 3:]]
-            st["sub"] = [sum(y[i] == pred[i][m] for i in s) / len(s) for s in cuts]
-            st["tr"] = {nm: tm([ret(pred[i][m], etf[dates[i]], kd, f, s) for i in ev]) for nm, kd, f, s in scen}
-            st["ev"] = ev; res[(g, m)] = st
-            summ.append({"table": g, "model": m, "first": dates[ev[0]], "last": dates[ev[-1]], "n": st["n"], "hit": st["hit"], "BA": st["BA"],
-                         "flat_days": st["flat_days"], "sub1": st["sub"][0], "sub2": st["sub"][1], "sub3": st["sub"][2],
-                         "sub_ranges": " | ".join(f"{dates[s[0]]}~{dates[s[-1]]}({len(s)})" for s in cuts), "vs58.6_pp": (st["hit"] - TARGET) * 100})
-            cmr.append(dict({"table": g, "model": m}, **st["cm"]))
-            prf.append(dict({"table": g, "model": m}, **{kk: st[kk] for kk in ("up_TP", "up_FP", "up_FN", "up_P", "up_R", "up_F1", "dn_TP", "dn_FP", "dn_FN", "dn_P", "dn_R", "dn_F1")}, n=st["n"], up_actual_n=st["up_TP"] + st["up_FN"], dn_actual_n=st["dn_TP"] + st["dn_FN"], up_pred_n=st["up_TP"] + st["up_FP"], dn_pred_n=st["dn_TP"] + st["dn_FP"], flat_days=st["flat_days"]))
-            for yy in sorted({dates[i][:4] for i in ev}):
-                s2 = stats([y[i] for i in ev if dates[i][:4] == yy], [pred[i][m] for i in ev if dates[i][:4] == yy])
-                yr.append({"table": g, "model": m, "year": yy, "n": s2["n"], "Acc": s2["hit"], "BA": s2["BA"], "flat_days": s2["flat_days"]})
-            if m == "M2":
-                brier = float(np.mean([(pred[i]["p2"] - (1.0 if y[i] == 1 else 0.0)) ** 2 for i in ev])); briers[g] = brier
-                for b in range(CAL_BINS):
-                    lo, hi = b / CAL_BINS, (b + 1) / CAL_BINS
-                    sel = [i for i in ev if lo <= pred[i]["p2"] < hi or (b == CAL_BINS - 1 and pred[i]["p2"] == 1.0)]
-                    calib.append({"table": g, "model": m, "bin_lo": lo, "bin_hi": hi, "n": len(sel),
-                                  "mean_prob_up": float(np.mean([pred[i]["p2"] for i in sel])) if sel else None,
-                                  "frac_up": sum(y[i] == 1 for i in sel) / len(sel) if sel else None})
-            else:
-                calib.append({"table": g, "model": m, "bin_lo": "不適用", "bin_hi": "不適用", "n": "不適用", "mean_prob_up": "不適用（無機率輸出）", "frac_up": "不適用"})
-            for nm, sel in (("結算日隔天", [i for i in ev if dates[i - 1] in stl]), ("非結算日隔天", [i for i in ev if dates[i - 1] not in stl])):
-                s3 = stats([y[i] for i in sel], [pred[i][m] for i in sel]) if sel else {"n": 0, "hit": None, "BA": None}
-                h0 = sum(y[i] == 1 for i in sel) / len(sel) if sel else None
-                sett.append({"table": g, "model": m, "group": nm, "n": s3["n"], "hit": s3["hit"], "BA": s3["BA"], "M0_same_days_hit": h0})
-            for nm, v in st["tr"].items():
-                trad.append({"table": g, "model": m, "標的": "0050（FinMind 未還原權息）", "scenario": nm, "fees": "假設、待核",
-                             "PF": v[0], "Sharpe": v[1], "CAGR": v[2], "MDD": v[3]})
-    mc, ps = [], []
-    for g, m in family:
-        ev = res[(g, m)]["ev"]; b, c, p = mcn([y[i] == pred[i][m] for i in ev], [y[i] == 1 for i in ev]); ps.append(p); mc.append([g, m, len(ev), b, c, p])
-    verdict = {}
-    for row, q in zip(mc, holm(ps)):
-        g, m = row[0], row[1]; row.append(q); s1 = res[(g, m)]; ev = s1["ev"]
-        m0 = stats([y[i] for i in ev], [1] * len(ev)); k = len(ev)
-        m0sub = [sum(y[i] == 1 for i in s) / len(s) for s in (ev[:k // 3], ev[k // 3:2 * k // 3], ev[2 * k // 3:])]
-        key = "多空_每趟費0.0001_滑價0.0"; sh0 = tm([ret(1, etf[dates[i]], "LS", 0.0001, 0.0) for i in ev])[1]
-        verdict[f"{g}|{m}"] = (s1["hit"] > m0["hit"] and q is not None and q < 0.05, sum(a > z for a, z in zip(s1["sub"], m0sub)) >= 2,
-                               s1["tr"][key][1] is not None and sh0 is not None and s1["tr"][key][1] > sh0)
-    mcr = [{"family": "Holm 5 檢定（r4c §7）", "table": r[0], "pair": f"{r[1]}>M0", "test": "單尾精確McNemar", "n": r[2], "b": r[3], "c": r[4], "p": r[5], "p_holm": r[6]} for r in mc]
-    R = os.path.join(C.ROOT, "results", C.VERSION); os.makedirs(os.path.join(R, "internal"), exist_ok=True)
-    def wcsv(name, rows, head=None):
-        with open(os.path.join(R, name), "x", newline="") as fh:
-            if head: fh.write(head)
-            w = csv.DictWriter(fh, fieldnames=list(rows[0].keys())); w.writeheader(); [w.writerow({k: fmt(v) for k, v in r.items()}) for r in rows]
-    wcsv("summary.csv", summ); wcsv("trading.csv", trad); wcsv("mcnemar.csv", mcr); wcsv("confusion.csv", cmr)
-    wcsv("yearly.csv", yr); wcsv("prf.csv", prf); wcsv("calibration.csv", calib); wcsv("settlement.csv", sett); wcsv("missing.csv", missing)
-    K = ("fold_id", "train_start", "train_end", "train_n", "purge_dates", "test_start", "test_end", "test_n")
-    wcsv("steps.csv", [dict(zip(K, s)) for s in steps])
-    sub_rows = []
-    for g in ("副表_M3", "副表_M4"):
-        S = tables[g][1]; first = dates[S[0]]
-        for s in steps:
-            if s[6] < first: continue
-            td = [dates[i] for i in S if s[5] <= dates[i] <= s[6]]
-            sub_rows.append({"table": g, "fold_id": s[0], "M2_train_start": s[1], "M2_train_end": s[2], "purge_dates": s[4], "test_start": td[0], "test_end": td[-1], "test_n": len(td),
-                             "note": "M3/M4 為規則、不訓練；第一個評分日由湊滿 750 天＋purge 1 算出；M2 欄為同輪 LR 訓練窗"})
-    wcsv("steps_sub.csv", sub_rows)
-    s3, s4 = set(tables["副表_M3"][1]), set(tables["副表_M4"][1])
-    def cell(i, m, S):   # 主表日、未湊滿 750 天、當天 missing → 空字串
-        if i not in S or pred[i][m] is None: return ""
-        return pred[i][m]
-    pub = [dict(zip(PUBLIC_COLS, (dates[i], pred[i]["M0"], pred[i]["M2"], pred[i]["p2"], pred[i]["round"], cell(i, "M3", s3), cell(i, "M4", s4)))) for i in sc]
-    wcsv("predictions.csv", pub)   # 表頭即欄位清單（chk2 要求第一列逐字等於表頭），欄位說明見 REPRODUCE.md
-    wcsv("internal/predictions_internal.csv", [{"date": dates[i], "round": pred[i]["round"], "model": m, "prob_up": (pred[i]["p2"] if m == "M2" else "不適用"),
-            "pred": ("missing" if pred[i][m] is None else pred[i][m]), "actual": y[i]} for i in sc for m in C.MODELS])
-    leak = os.path.join(R, "leak_test.txt"); leak_ok = open(leak).read().startswith("PASS") if os.path.exists(leak) else None
-    hdr = {"version": C.VERSION, "label": "FinMind・回測練習（不算正式成績）；未審初版、紙上、非投資建議",
-           "unseal": "開發期 2020–2024 評分；2025 起不讀",
-           "holdout": "2025-01-01 以後本版不讀、不跑",
-           "params": {"SCORE_START": C.SCORE_START, "DEV_END": C.DEV_END, "HOLDOUT_START": C.HOLDOUT_START, "TRAIN": C.TRAIN, "TEST": C.TEST, "STEP": C.STEP, "PURGE": C.PURGE,
-                      "window_meaning": "750 日訓練窗、20 日測試、每次往前 20 日、purge 1", "C_L2": C.C_L2, "IRLS_MAX": C.IRLS_MAX, "IRLS_TOL": C.IRLS_TOL},
-           "sha": shas, "program_sha": {f: C.sha(os.path.join(C.ROOT, "src", f)) for f in ("backtest.py", "common.py", "make_dev_slice.py", "leak_test.py")},
-           "python": platform.python_version(), "numpy": np.__version__, "scipy": scipy.__version__, "sklearn": "未安裝（M2 用 numpy IRLS 自寫）",
-           "total_rows_taiex_dev": len(dates), "steps": len(steps), "first_oos": dates[min(pred)], "scoring_window_rows": len(sc),
-           "first_scoring_day": {"主表": dates[sc[0]], "M3": dates[ks["M3"]] if ks["M3"] is not None else None, "M4": dates[ks["M4"]] if ks["M4"] is not None else None},
-           "tables": {g: {"models": ms, "first": dates[ix[0]], "last": dates[ix[-1]], "n": len(ix)} for g, (ms, ix) in tables.items()},
-           "M4_note": "M4 期貨腿＝外資多空交易口數淨額（不是 M3 的淨未平倉變化）；現貨腿只用 Foreign_Investor，不含外資自營商；單位待核；公布時刻待核",
-           "M5": "已實作（見 METHOD.md §3）",
-           "fees": "假設、待核（含期交稅十萬分之二×2、手續費、證交稅）",
-           "settlement": "結算日＝第三個星期三、非交易日順延（假設、待核）；settlement.csv 為分表、不改判準",
-           "target": "交易模擬標的 0050（FinMind、未還原權息），D 日開盤進、收盤出；方向指標用加權指數；預測與交易分開",
-           "flat_rule": "平盤計入分母算錯；BA 只用漲、跌 Recall 平均；混淆矩陣 3×2",
-           "brier_M2": None,
-           "leak_test": "PASS" if leak_ok else ("FAIL" if leak_ok is False else "未判定")}
-    hdr["brier_M2"] = briers
-    sj = {"brier_M2": briers, "summary": summ, "mcnemar_holm5": mcr, "confusion_3x2": cmr, "yearly": yr, "prf": prf, "calibration": calib, "settlement": sett, "missing": missing,
-          "trading": trad, "verdict_vs_M0": {k: {"條1": v[0], "條2": v[1], "條3": v[2], "條4": hdr["leak_test"], "結論": "贏" if all(v) and leak_ok else "沒有贏"} for k, v in verdict.items()}}
-    with open(os.path.join(R, "run-header.json"), "x") as fh: json.dump(hdr, fh, ensure_ascii=False, indent=1, sort_keys=True)
-    with open(os.path.join(R, "summary.json"), "x") as fh: json.dump(sj, fh, ensure_ascii=False, indent=1, sort_keys=True, default=str)
-    gaps = [(dates[k - 1], dates[k], (dt.date.fromisoformat(dates[k]) - dt.date.fromisoformat(dates[k - 1])).days) for k in range(1, len(dates))
-            if (dt.date.fromisoformat(dates[k]) - dt.date.fromisoformat(dates[k - 1])).days > 10]   # 警示、不停機
-    with open(os.path.join(R, "report.md"), "x") as fh:
-        fh.write("# 回測報告 " + C.VERSION + "（FinMind・回測練習，不算正式成績；未審初版、紙上、非投資建議）\n\n```json\n" + json.dumps(hdr, ensure_ascii=False, indent=1, sort_keys=True) +
-                 "\n```\n\n## Holm 5 檢定\n" + "\n".join(f"- {r['table']} {r['pair']} n={r['n']} b={r['b']} c={r['c']} p={fmt(r['p'])} p_holm={fmt(r['p_holm'])}" for r in mcr) +
-                 "\n\n## 判定\n" + "\n".join(f"- {k}: {d}" for k, d in sj["verdict_vs_M0"].items()) +
-                 f"\n\n## 警示：連續兩列相隔超過 10 個日曆天（TAIEX 開發期檔，共 {len(gaps)} 處；只警示、不停機）\n" + "\n".join(f"- {a} → {b}：{d} 天" for a, b, d in gaps) + "\n")
-    print(json.dumps(hdr["first_scoring_day"], ensure_ascii=False))
+    idx = sorted(pred)
+    common = [i for i in idx if all(pred[i][m] is not None for m in C.MODELS)]
+    folder = Path(tempfile.mkdtemp(prefix="stockbot-v104-"))
+    summary, annual, matrix, prf, coverage, audit, public, private = [], [], [], [], [], [], [], []
+    sources = {"M0":"constant", "M1":"TAIEX", "M2":"TAIEX", "M3":"TX foreign OI",
+               "M4":"TX foreign net deals + Foreign_Investor net spot", "M5":"TAIEX"}
+    for i in idx:
+        public.append(dict(date=dates[i], fold_id=pred[i]["round"], model_version=C.VERSION,
+                           **{m.lower()+"_pred":pred[i][m] for m in C.MODELS}, m2_prob_up=pred[i]["p2"]))
+        private.append(dict(date=dates[i], actual=y[i]))
+        for m in C.MODELS:
+            state = status(m,i,dates,oi,deal,spot,pred[i][m])
+            audit.append(dict(date=dates[i],model=m,source=sources[m],feature_date=dates[i-1] if m!="M0" else "",
+                              coverage_end=dates[i-1] if m!="M0" else "", publication_time="",
+                              cutoff=dates[i]+"T08:45:00+08:00",state=state,
+                              availability="VERIFIED" if m=="M0" else "NOT AVAILABLE" if state=="MISSING" else "UNVERIFIED"))
+    rule_starts = C.sub_starts(dates,oi,deal,spot)
+    for m in C.MODELS:
+        states = [r for r in audit if r["model"]==m]
+        valid = [i for i in idx if pred[i][m] is not None]
+        if m in rule_starts:
+            pos = rule_starts[m]
+            feature = dates[pos] if pos is not None else None
+        else:
+            feature = dates[{"M0":0,"M1":2,"M2":22,"M5":270}[m]]
+        coverage.append(dict(model=m, sessions=len(idx), first_feature=feature, first_prediction=dates[valid[0]] if valid else None,
+                             coverage=len(valid)/len(idx), no_call_rate=1-len(valid)/len(idx),
+                             missing_rate=sum(r["state"]=="MISSING" for r in states)/len(idx),
+                             conservative_hits=sum(pred[i][m]==y[i] for i in valid),
+                             **{k:sum(r["state"]==k for r in states) for k in ("VALID","WARM_UP","MISSING","ABSTENTION","INVALID")}))
+        for table, subset in (("full",valid),("common",common)):
+            st = stats([y[i] for i in subset],[pred[i][m] for i in subset])
+            ids = dict(table=table, model=m, n=len(subset))
+            summary.append(dict(**ids,accuracy=st["hit"],balanced_accuracy=st["BA"],flat=st["flat_days"]))
+            matrix.append(dict(**ids,**st["cm"]))
+            prf.append(dict(**ids,**{k:v for k,v in st.items() if k.startswith(("up_","dn_"))}))
+            for year in sorted({dates[i][:4] for i in idx}):
+                ss=[i for i in subset if dates[i][:4]==year]
+                sy=stats([y[i] for i in ss],[pred[i][m] for i in ss])
+                annual.append(dict(table=table,model=m,year=year,n=len(ss),accuracy=sy["hit"],BA=sy["BA"]))
+    pairs=[]
+    for m in C.MODELS[1:]:
+        sel=[i for i in idx if pred[i][m] is not None]
+        b,c,p=mcn([pred[i][m]==y[i] for i in sel],[y[i]==1 for i in sel])
+        low,high=block_interval([int(pred[i][m]==y[i])-int(y[i]==1) if pred[i][m] is not None else np.nan for i in idx])
+        pairs.append(dict(model=m,n=len(sel),b=b,c=c,p=p,paired_block95_low=low,paired_block95_high=high))
+    for row,q in zip(pairs,holm([r["p"] for r in pairs])):
+        row["holm"]=q
+    probabilities,cal=probability_scores([(pred[i],y[i]) for i in idx if pred[i]["p2"] is not None])
+    trade,curve,years=trading(dates,etf,pred,idx)
+    features=[r for i in idx for r in feature_catalog(i,dates,oi,deal,spot)]
+    settlement=settle_days(dates)
+    settlement_rows=[]
+    for m in C.MODELS:
+        for flag in (False,True):
+            sel=[i for i in idx if (dates[i-1] in settlement)==flag and pred[i][m] is not None]
+            st=stats([y[i] for i in sel],[pred[i][m] for i in sel])
+            settlement_rows.append(dict(model=m,following_assumed_settlement=flag,n=len(sel),hit=st["hit"],BA=st["BA"]))
+    (folder/"calibration.svg").write_bytes(calibration_svg(cal).encode())
+    header=dict(version=C.VERSION,python=platform.python_version(),numpy=np.__version__,scipy=scipy.__version__,
+                train=C.TRAIN,test=C.TEST,step=C.STEP,purge=C.PURGE,C_L2=C.C_L2,
+                cutoff="08:45 Asia/Taipei",first=dates[idx[0]],last=dates[idx[-1]],
+                publication_evidence="UNVERIFIED",input_hashes={k:getattr(C,k)[1] for k in ("TAIEX","INST","SPOT","ETF")},
+                program_sha={n:C.sha(Path(__file__).with_name(n)) for n in ("backtest.py","common.py","leak_test.py")})
+    (folder/"run-header.json").write_bytes(json.dumps(header,sort_keys=True,indent=2).encode())
+    for name, rows in (("predictions",public),("internal_actuals",private),("coverage",coverage),("availability",features),
+                       ("summary",summary),("yearly",annual),("confusion",matrix),("prf",prf),("mcnemar",pairs),("settlement",settlement_rows),
+                       ("probability",probabilities),("calibration",cal),("trading",trade),("equity",curve),("trading_yearly",years),
+                       ("steps",[dict(zip(("fold","train_start","train_end","train_n","purge","first","last","test_n"),s)) for s in steps])):
+        write_csv(folder,name+".csv",rows)
+    print(folder)
+
 
 if __name__ == "__main__":
     main()

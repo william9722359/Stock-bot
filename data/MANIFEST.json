@@ -20,6 +20,17 @@
   "in_git": false
  },
  {
+  "path": "data/finmind/finmind-TaiwanStockTotalInstitutionalInvestors.json",
+  "source": "FinMind TaiwanStockTotalInstitutionalInvestors",
+  "first": null,
+  "last": null,
+  "fetched": null,
+  "rows": null,
+  "sha256": "847865abfbdcedd6f538adaafd6efcd404f2f8c6d0e2e0f527f1ae83c48e7f5e",
+  "in_git": false,
+  "method": "FinMind API snapshot; original request bounds, serialization and collection time not published at 110ec47a"
+ },
+ {
   "path": "data/finmind/finmind-TaiwanStockPrice-0050-20030101-20241231.json",
   "source": "FinMind TaiwanStockPrice 0050（免金鑰公開端點）",
   "fetched": "fetched 2026-11-04 01:14:42",
@@ -46,7 +57,11 @@
   "rows": 6451,
   "sha256": "ffb8d6d3d7da818d85c89196705a198c4d4aaa3f6d16bf5b6bacace6cfe1350d",
   "in_git": false,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "first": "1999-01-05",
+  "last": "2024-12-31",
+  "upper_bound": "2024-12-31",
+  "method": "Archived 110ec47a make_dev_slice.py; filter date <= 2024-12-31, canonical UTF-8 JSON; use already isolated export"
  },
  {
   "path": "data/dev/finmind-TaiwanFuturesInstitutionalInvestors-TX.json",
@@ -55,7 +70,11 @@
   "rows": 4815,
   "sha256": "238be435804cfa86ce6782102f5c407c94c7acfc80f610a7fa1db8d761d7a593",
   "in_git": false,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "first": "2018-06-05",
+  "last": null,
+  "upper_bound": "2024-12-31",
+  "method": "Archived 110ec47a make_dev_slice.py; filter date <= 2024-12-31, canonical UTF-8 JSON; use already isolated export"
  },
  {
   "path": "data/dev/finmind-TaiwanStockTotalInstitutionalInvestors.json",
@@ -64,13 +83,18 @@
   "rows": 24622,
   "sha256": "807e695b5619b93db9634de4ee6e8cad66398e8c30eee732cf86150be7886f67",
   "in_git": false,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "first": null,
+  "last": null,
+  "upper_bound": "2024-12-31",
+  "method": "Archived 110ec47a make_dev_slice.py; filter date <= 2024-12-31, canonical UTF-8 JSON; use already isolated export"
  },
  {
   "path": "src/make_dev_slice.py",
   "role": "截斷腳本",
   "sha256": "8089abc93f18c609366ae5773af1d9bf43c79edf291ecbb1b85871e1e3e98734",
   "in_git": true,
-  "version": "v1.0.1"
+  "version": "v1.0.1",
+  "at_commit": "110ec47acc8bc92d00e6ed3190ad02f466e2df8a"
  }
 ]

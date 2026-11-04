@@ -1,0 +1,4 @@
+results/v1.0.3b/** -text
+METHOD.md -text
+src/*.py text eol=lf
+src/*.sh text eol=lf

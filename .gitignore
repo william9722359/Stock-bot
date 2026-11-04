@@ -1,2 +1,4 @@
 data/*
 !data/MANIFEST.json
+__pycache__/
+/results/v1.0.4/
