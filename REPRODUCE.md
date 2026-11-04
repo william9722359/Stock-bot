@@ -25,4 +25,4 @@ bash src/run_twice.sh              # 兩次重跑逐位元比對，rc=0
 SCORE_START=2020-01-02、DEV_END=2024-12-31、HOLDOUT_START=2025-01-01；TRAIN=750、TEST=20、STEP=20、PURGE=1。
 
 ## 4. predictions.csv 欄位
-date（目標日 D）, m0_pred（1=漲）, lr_pred（M2，1=漲 0=跌，p≥0.5 猜漲）, lr_prob_up（M2 上漲機率）, fold_id（對到 steps.csv）, m3_pred, m4_pred（只在各自副表期間有值；主表日、未湊滿 750 天、missing 留空）。不含實際漲跌、對錯、close、特徵；請用自己抓的 FinMind TAIEX close 對答案（y_D=1 若 close_D>close_{D−1}，平盤算錯）。
+v1.0.4 起 10 欄：date（目標日 D）, fold_id（對到 steps.csv）, m0_pred, m1_pred, m2_pred（LR，p≥0.5 猜漲）, m2_prob_up, m3_pred, m4_pred（只在各自副表期間有值；未湊滿 750 天或 missing 留空）, m5_pred, model_version。1=漲 0=跌。不含實際漲跌、對錯、close、特徵；請用自己抓的 FinMind TAIEX close 對答案（y_D=1 若 close_D>close_{D−1}，平盤算錯）。輸出預設寫 runs/<VERSION>（或 BT_OUT），程式不寫 results/。
